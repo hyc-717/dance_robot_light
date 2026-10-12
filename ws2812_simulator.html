@@ -1,0 +1,1465 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WS2812 可视化仿真</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202626;
+      --muted: #687270;
+      --line: #d9dfdc;
+      --paper: #f3f5f2;
+      --panel: #fff;
+      --green: #087f5b;
+      --orange: #d76732;
+      --blue: #2878a5;
+      --led-off: #161c1b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+      font-size: 14px;
+    }
+
+    button, input { font: inherit; }
+    button { color: inherit; }
+
+    .shell {
+      width: min(1440px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 24px 0 36px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      display: grid;
+      grid-template-columns: repeat(2, 7px);
+      gap: 3px;
+      padding: 8px;
+      border: 1px solid #b8c5c0;
+      border-radius: 5px;
+      background: #e8efeb;
+    }
+
+    .brand-mark i {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+
+    .brand-mark i:nth-child(2), .brand-mark i:nth-child(3) {
+      background: var(--orange);
+    }
+
+    .eyebrow {
+      margin: 0 0 3px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 650;
+    }
+
+    .offline {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      white-space: nowrap;
+      color: #315e4f;
+      font-size: 12px;
+    }
+
+    .offline::before {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #36a478;
+      content: "";
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 14px 18px;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .icon-button {
+      min-height: 34px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .control-label {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .color-control {
+      width: 38px;
+      height: 34px;
+      padding: 3px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .number-control {
+      width: 62px;
+      height: 34px;
+      padding: 0 7px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: #fff;
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .select-control {
+      width: min(320px, 60vw);
+      min-height: 34px;
+      padding: 0 28px 0 9px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    .task-state {
+      padding: 7px 9px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      color: var(--muted);
+      background: #f7f9f7;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .timeline {
+      padding: 14px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .timeline-toolbar, .timeline-actions {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .timeline-toolbar {
+      justify-content: space-between;
+      margin-bottom: 11px;
+    }
+
+    .frame-status {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .frame-status strong { font-size: 13px; }
+    .frame-status span { color: var(--muted); font-size: 12px; }
+
+    .frame-list {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 2px 1px 6px;
+    }
+
+    .frame-item {
+      display: grid;
+      flex: 0 0 72px;
+      justify-items: center;
+      gap: 5px;
+      min-height: 79px;
+      padding: 7px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: #fff;
+      color: var(--ink);
+      cursor: pointer;
+    }
+
+    .frame-item[aria-pressed="true"] {
+      border-color: var(--green);
+      box-shadow: inset 0 0 0 1px var(--green);
+    }
+
+    .frame-item canvas {
+      width: 44px;
+      height: 44px;
+      image-rendering: pixelated;
+      background: #101514;
+    }
+
+    .frame-item span {
+      color: var(--muted);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #test-button[aria-pressed="true"] {
+      border-color: #9bc7b7;
+      color: #176548;
+      background: #eaf5ef;
+    }
+
+    .export-dialog {
+      width: min(900px, calc(100% - 24px));
+      max-width: none;
+      max-height: min(90vh, 900px);
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--ink);
+      background: #fff;
+      box-shadow: 0 18px 60px #15201c38;
+    }
+
+    .export-dialog::backdrop { background: #111b19a6; }
+
+    .dialog-content { padding: 18px; }
+
+    .dialog-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .dialog-heading h2 { font-size: 16px; }
+
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-top: 10px;
+    }
+
+    .code-output {
+      display: block;
+      width: 100%;
+      min-height: 48vh;
+      resize: vertical;
+      padding: 12px;
+      border: 1px solid #cbd3cf;
+      border-radius: 4px;
+      background: #f5f7f5;
+      color: #202626;
+      font: 12px/1.55 Consolas, "Courier New", monospace;
+      tab-size: 4;
+      white-space: pre;
+    }
+
+    .icon-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 11px;
+      border: 1px solid var(--line);
+      background: #fff;
+      white-space: nowrap;
+    }
+
+    .icon-button:hover { background: #f7faf8; }
+    .icon-button:active { transform: translateY(1px); }
+    .icon-button:disabled { opacity: .5; cursor: not-allowed; }
+
+    .icon-button svg {
+      width: 15px;
+      height: 15px;
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.8;
+    }
+
+    .boards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      padding-top: 18px;
+    }
+
+    .board-panel {
+      min-width: 0;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel);
+    }
+
+    .panel-heading {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 9px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 650;
+    }
+
+    .hardware, .led-count {
+      color: var(--muted);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .screen-frame {
+      width: min(100%, 450px);
+      margin: 0 auto;
+      padding: 12px;
+      border: 1px solid #cbd3cf;
+      border-radius: 5px;
+      background: #e9eeeb;
+    }
+
+    .screen-grid {
+      display: grid;
+      grid-template-columns: repeat(16, minmax(0, 1fr));
+      gap: clamp(2px, .65vw, 7px);
+      width: 100%;
+      aspect-ratio: 1;
+      padding: 8px;
+      border: 1px solid #242d2a;
+      border-radius: 4px;
+      background: #101514;
+    }
+
+    .led {
+      display: block;
+      width: 100%;
+      min-width: 0;
+      aspect-ratio: 1;
+      padding: 0;
+      border: 1px solid #29312f;
+      border-radius: 50%;
+      background: var(--led-off);
+      cursor: crosshair;
+      transition: background-color 70ms linear, box-shadow 70ms linear;
+      touch-action: none;
+    }
+
+    .led:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 1px;
+    }
+
+    .screen-index {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 1px 0;
+      color: #66716d;
+      font-size: 10px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .strip-panel {
+      margin-top: 16px;
+      padding: 16px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .strip-scroll {
+      overflow-x: auto;
+      padding: 12px 2px 8px;
+    }
+
+    .strip {
+      display: grid;
+      grid-template-columns: repeat(60, 1fr);
+      align-items: center;
+      gap: clamp(3px, .55vw, 8px);
+      min-width: 850px;
+      padding: 12px;
+      border: 1px solid #cbd3cf;
+      border-radius: 5px;
+      background: #e9eeeb;
+    }
+
+    .strip .led {
+      width: 100%;
+      border-width: 1px;
+    }
+
+    .strip-foot {
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 13px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      clip-path: inset(50%);
+    }
+
+    @media (max-width: 760px) {
+      .shell { width: min(100% - 24px, 560px); padding-top: 16px; }
+      .topbar { align-items: flex-start; }
+      .boards { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+      .board-panel { padding: 12px; }
+      .screen-frame { width: min(100%, 390px); padding: 9px; }
+      .screen-grid { gap: 3px; padding: 6px; }
+      .toolbar { gap: 12px; }
+      .toolbar { gap: 10px; }
+      .select-control { width: min(100%, 320px); }
+      .strip-panel { margin-top: 12px; padding: 14px 10px; }
+      .dialog-content { padding: 12px; }
+      .timeline-toolbar { align-items: flex-start; }
+      .timeline-actions { width: 100%; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <div>
+          <p class="eyebrow">WS2812 / VISUAL LAB</p>
+          <h1>灯屏与灯带仿真</h1>
+        </div>
+      </div>
+      <span class="offline">离线仿真</span>
+    </header>
+
+    <section class="toolbar" aria-label="固件 API 仿真">
+      <label class="control-group">
+        <span class="control-label">模式</span>
+        <select id="mode-select" class="select-control" aria-label="选择设计模式或源代码动画">
+          <option value="design">图案设计</option>
+          <optgroup label="ws2812.c 注释中的版本">
+            <option value="fade">RGB 渐变填充</option>
+            <option value="ripple">中心菱形波纹</option>
+            <option value="matrix">双向流水</option>
+            <option value="rainbow">干涉彩虹</option>
+            <option value="fire">火焰与余烬</option>
+            <option value="wu">静态点阵图案</option>
+            <option value="lotus">莲花开合</option>
+          </optgroup>
+        </select>
+      </label>
+      <button id="preview-button" class="icon-button" type="button" title="播放所选源代码动画" aria-label="播放所选源代码动画" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7z"></path></svg>
+        <span>预览</span>
+      </button>
+      <span class="task-state">39 ms / 帧</span>
+
+      <label class="control-group">
+        <span class="control-label">画笔</span>
+        <input id="color-picker" class="color-control" type="color" value="#19c99a" aria-label="画笔颜色">
+      </label>
+
+      <span class="control-label">FillCmd RGB</span>
+      <label><span class="sr-only">红色</span><input id="fill-r" class="number-control" type="number" min="0" max="255" value="0" aria-label="填充红色分量"></label>
+      <label><span class="sr-only">绿色</span><input id="fill-g" class="number-control" type="number" min="0" max="255" value="0" aria-label="填充绿色分量"></label>
+      <label><span class="sr-only">蓝色</span><input id="fill-b" class="number-control" type="number" min="0" max="255" value="0" aria-label="填充蓝色分量"></label>
+      <button id="fill-button" class="icon-button" type="button" title="模拟 WS2812_FillCmd">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18"></path></svg>
+        <span>三路填充</span>
+      </button>
+      <button id="clear-button" class="icon-button" type="button" title="模拟 WS2812_OffCmd">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"></path></svg>
+        <span>全部关闭</span>
+      </button>
+      <button id="test-button" class="icon-button" type="button" title="模拟 WS2812_TestCmd" aria-pressed="false">
+        <span>TestCmd</span>
+      </button>
+      <output id="task-state" class="task-state" aria-live="polite">ws2812_change = 0</output>
+      <button id="export-button" class="icon-button" type="button" title="导出设计帧动画为 C 代码">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v4h14v-4"></path></svg>
+        <span>导出 C</span>
+      </button>
+    </section>
+
+    <section id="design-timeline" class="timeline" aria-label="动态图案帧编辑">
+      <div class="timeline-toolbar">
+        <div class="frame-status">
+          <strong id="frame-count">第 1 帧 / 共 1 帧</strong>
+          <span>39 ms / 帧</span>
+        </div>
+        <div class="timeline-actions">
+          <button id="frame-prev" class="icon-button" type="button" aria-label="上一帧" title="上一帧">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+          </button>
+          <button id="frame-play" class="icon-button" type="button" aria-label="播放设计帧" title="播放设计帧">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7z"></path></svg>
+            <span>播放</span>
+          </button>
+          <button id="frame-next" class="icon-button" type="button" aria-label="下一帧" title="下一帧">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>
+          </button>
+          <button id="frame-duplicate" class="icon-button" type="button" title="复制当前帧">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3M5 8h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"></path></svg>
+            <span>复制帧</span>
+          </button>
+          <button id="frame-add" class="icon-button" type="button" title="新增空白帧">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+            <span>空白帧</span>
+          </button>
+          <button id="frame-delete" class="icon-button" type="button" title="删除当前帧">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"></path></svg>
+            <span>删除帧</span>
+          </button>
+        </div>
+      </div>
+      <div id="frame-list" class="frame-list" role="group" aria-label="设计帧列表"></div>
+    </section>
+
+    <section class="boards" aria-label="16 乘 16 灯屏">
+      <article class="board-panel">
+        <div class="panel-heading">
+          <div class="panel-title">
+            <h2>灯屏 1</h2>
+            <span class="hardware">PB1 / TIM3_CH4</span>
+          </div>
+          <span class="led-count">256 LED</span>
+        </div>
+        <div class="screen-frame">
+          <div id="screen-1" class="screen-grid" role="grid" aria-label="灯屏 1，16 行 16 列"></div>
+          <div class="screen-index"><span>行 0</span><span>行 15</span></div>
+        </div>
+      </article>
+
+      <article class="board-panel">
+        <div class="panel-heading">
+          <div class="panel-title">
+            <h2>灯屏 2</h2>
+            <span class="hardware">PB10 / TIM2_CH3</span>
+          </div>
+          <span class="led-count">256 LED</span>
+        </div>
+        <div class="screen-frame">
+          <div id="screen-2" class="screen-grid" role="grid" aria-label="灯屏 2，16 行 16 列"></div>
+          <div class="screen-index"><span>行 0</span><span>行 15</span></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="strip-panel" aria-label="60 灯 LED 灯带">
+      <div class="panel-heading">
+        <div class="panel-title">
+          <h2>LED 灯带</h2>
+          <span class="hardware">PB0 / TIM3_CH3</span>
+        </div>
+        <span class="led-count">60 LED</span>
+      </div>
+      <div class="strip-scroll">
+        <div id="strip" class="strip" role="group" aria-label="LED 灯带，索引 0 到 59"></div>
+      </div>
+      <div class="strip-foot"><span>LED 0</span><span>LED 59</span></div>
+    </section>
+
+    <footer class="footer">
+      <span>动画参数取自 ws2812.c 注释版本；当前有效 WS2812_Change() 为空实现</span>
+      <span>屏幕蛇形坐标 · 灯带索引 0 → 59 · 设计帧序列可导出</span>
+    </footer>
+  </main>
+
+  <dialog id="export-dialog" class="export-dialog">
+    <div class="dialog-content">
+      <div class="dialog-heading">
+        <h2>WS2812 C 代码</h2>
+        <button id="close-export" class="icon-button" type="button" title="关闭代码预览" aria-label="关闭代码预览">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"></path></svg>
+        </button>
+      </div>
+      <textarea id="code-output" class="code-output" readonly spellcheck="false" aria-label="生成的 C 代码"></textarea>
+      <div class="dialog-actions">
+        <button id="copy-code" class="icon-button" type="button" title="复制代码">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="1"></rect><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"></path></svg>
+          <span>复制</span>
+        </button>
+        <button id="download-code" class="icon-button" type="button" title="下载 .c 文件">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v4h14v-4"></path></svg>
+          <span>下载 .c</span>
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const WIDTH = 16;
+      const HEIGHT = 16;
+      const SCREEN_COUNT = WIDTH * HEIGHT;
+      const STRIP_COUNT = 60;
+      const FRAME_MS = 39;
+      const screens = [
+        Array.from({ length: SCREEN_COUNT }, () => [0, 0, 0]),
+        Array.from({ length: SCREEN_COUNT }, () => [0, 0, 0])
+      ];
+      const strip = Array.from({ length: STRIP_COUNT }, () => [0, 0, 0]);
+      const designFrames = [{
+        screens: screens.map((colors) => colors.map((color) => [...color])),
+        strip: strip.map((color) => [...color])
+      }];
+      const screenNodes = [document.querySelector("#screen-1"), document.querySelector("#screen-2")];
+      const stripNode = document.querySelector("#strip");
+      const modeSelect = document.querySelector("#mode-select");
+      const previewButton = document.querySelector("#preview-button");
+      const designTimeline = document.querySelector("#design-timeline");
+      const frameList = document.querySelector("#frame-list");
+      const frameCount = document.querySelector("#frame-count");
+      const framePlayButton = document.querySelector("#frame-play");
+      const colorPicker = document.querySelector("#color-picker");
+      const fillInputs = [
+        document.querySelector("#fill-r"),
+        document.querySelector("#fill-g"),
+        document.querySelector("#fill-b")
+      ];
+      const taskState = document.querySelector("#task-state");
+      const testButton = document.querySelector("#test-button");
+      const exportDialog = document.querySelector("#export-dialog");
+      const codeOutput = document.querySelector("#code-output");
+      let changeFlag = false;
+      let painting = false;
+      let mode = "design";
+      let timer = null;
+      let playing = false;
+      let designTimer = null;
+      let designPlaying = false;
+      let selectedDesignFrame = 0;
+      let frame = 0;
+      let stripIndex = 0;
+      let firstFrameDrawn = false;
+      let fade = null;
+      let fireHeat = null;
+      let fireSeed = 0x12345678;
+
+      function screenIndex(row, col) {
+        return row * WIDTH + ((row % 2 === 0) ? WIDTH - 1 - col : col);
+      }
+
+      function setDevice(device, index, color) {
+        if (device === 0) strip[index] = color;
+        else screens[device - 1][index] = color;
+      }
+
+      function fillDevice(device, color) {
+        const colors = device === 0 ? strip : screens[device - 1];
+        for (let index = 0; index < colors.length; index++) colors[index] = [...color];
+      }
+
+      function setScreenPixel(screen, row, col, color) {
+        setDevice(screen + 1, screenIndex(row, col), color);
+      }
+
+      function captureDesignFrame() {
+        return {
+          screens: screens.map((colors) => colors.map((color) => [...color])),
+          strip: strip.map((color) => [...color])
+        };
+      }
+
+      function renderFrameThumbnail(canvas, snapshot) {
+        const context = canvas.getContext("2d");
+        if (!context) return;
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        const cell = canvas.width / WIDTH;
+        for (let row = 0; row < HEIGHT; row++) {
+          for (let col = 0; col < WIDTH; col++) {
+            const color = snapshot.screens[0][screenIndex(row, col)];
+            context.fillStyle = color.some((component) => component > 0)
+              ? `rgb(${color[0]} ${color[1]} ${color[2]})`
+              : "#161c1b";
+            context.fillRect(col * cell, row * cell, Math.ceil(cell), Math.ceil(cell));
+          }
+        }
+      }
+
+      function updateFrameSelection() {
+        for (const button of frameList.children) {
+          const index = Number(button.dataset.frameIndex);
+          button.setAttribute("aria-pressed", String(index === selectedDesignFrame));
+        }
+        frameCount.textContent = `第 ${selectedDesignFrame + 1} 帧 / 共 ${designFrames.length} 帧`;
+        document.querySelector("#frame-delete").disabled = designFrames.length === 1;
+        const selectedButton = frameList.querySelector(`[data-frame-index="${selectedDesignFrame}"]`);
+        if (selectedButton) renderFrameThumbnail(selectedButton.querySelector("canvas"), designFrames[selectedDesignFrame]);
+      }
+
+      function renderFrameTimeline() {
+        frameList.replaceChildren();
+        designFrames.forEach((snapshot, index) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "frame-item";
+          button.dataset.frameIndex = String(index);
+          button.setAttribute("aria-pressed", String(index === selectedDesignFrame));
+          button.setAttribute("aria-label", `选择第 ${index + 1} 帧`);
+          const canvas = document.createElement("canvas");
+          canvas.width = 48;
+          canvas.height = 48;
+          canvas.setAttribute("aria-hidden", "true");
+          const label = document.createElement("span");
+          label.textContent = `帧 ${index + 1}`;
+          button.append(canvas, label);
+          frameList.appendChild(button);
+          renderFrameThumbnail(canvas, snapshot);
+        });
+        updateFrameSelection();
+      }
+
+      function saveSelectedDesignFrame() {
+        designFrames[selectedDesignFrame] = captureDesignFrame();
+        updateFrameSelection();
+      }
+
+      function loadDesignFrame(index) {
+        selectedDesignFrame = index;
+        const snapshot = designFrames[index];
+        for (let screen = 0; screen < 2; screen++) {
+          for (let pixel = 0; pixel < SCREEN_COUNT; pixel++) {
+            screens[screen][pixel] = [...snapshot.screens[screen][pixel]];
+          }
+        }
+        for (let pixel = 0; pixel < STRIP_COUNT; pixel++) {
+          strip[pixel] = [...snapshot.strip[pixel]];
+        }
+        render();
+        updateFrameSelection();
+      }
+
+      function setDesignPlayButton(isPlaying) {
+        framePlayButton.setAttribute("aria-label", isPlaying ? "暂停设计帧" : "播放设计帧");
+        framePlayButton.title = isPlaying ? "暂停设计帧" : "播放设计帧";
+        framePlayButton.querySelector("span").textContent = isPlaying ? "暂停" : "播放";
+        framePlayButton.querySelector("svg").innerHTML = isPlaying
+          ? '<path d="M8 5v14M16 5v14"></path>'
+          : '<path d="m8 5 11 7-11 7z"></path>';
+      }
+
+      function stopDesignPlayback() {
+        if (designTimer !== null) {
+          window.clearInterval(designTimer);
+          designTimer = null;
+        }
+        designPlaying = false;
+        setDesignPlayButton(false);
+      }
+
+      function selectDesignFrame(index) {
+        stopDesignPlayback();
+        loadDesignFrame((index + designFrames.length) % designFrames.length);
+      }
+
+      function startDesignPlayback() {
+        if (mode !== "design") enterDesignMode();
+        if (designPlaying) return;
+        designPlaying = true;
+        setDesignPlayButton(true);
+        designTimer = window.setInterval(() => {
+          loadDesignFrame((selectedDesignFrame + 1) % designFrames.length);
+        }, FRAME_MS);
+      }
+
+      function clearState() {
+        fillDevice(0, [0, 0, 0]);
+        fillDevice(1, [0, 0, 0]);
+        fillDevice(2, [0, 0, 0]);
+        render();
+      }
+
+      function makeLed(parent, title, paint) {
+        const led = document.createElement("button");
+        led.type = "button";
+        led.className = "led";
+        led.title = title;
+        led.setAttribute("aria-label", title);
+        led.addEventListener("pointerdown", (event) => {
+          enterDesignMode();
+          event.preventDefault();
+          painting = true;
+          paint(readBrush());
+        });
+        led.addEventListener("pointerenter", () => {
+          if (painting) paint(readBrush());
+        });
+        parent.appendChild(led);
+        return led;
+      }
+
+      const screenLedNodes = [[], []];
+      for (let screen = 0; screen < 2; screen++) {
+        for (let row = 0; row < HEIGHT; row++) {
+          for (let col = 0; col < WIDTH; col++) {
+            const index = screenIndex(row, col);
+            screenLedNodes[screen][index] = makeLed(
+              screenNodes[screen],
+              `第 ${screen + 1} 屏 · 行 ${row} 列 ${col} · 数据索引 ${index}`,
+              (color) => {
+                screens[screen][index] = color;
+                renderOne(screenLedNodes[screen][index], color);
+                saveSelectedDesignFrame();
+              }
+            );
+          }
+        }
+      }
+
+      const stripLedNodes = [];
+      for (let index = 0; index < STRIP_COUNT; index++) {
+        stripLedNodes[index] = makeLed(
+          stripNode,
+          `灯带 · LED ${index}`,
+          (color) => {
+            strip[index] = color;
+            renderOne(stripLedNodes[index], color);
+            saveSelectedDesignFrame();
+          }
+        );
+      }
+
+      window.addEventListener("pointerup", () => { painting = false; });
+      window.addEventListener("pointercancel", () => { painting = false; });
+
+      function readBrush() {
+        const value = colorPicker.value;
+        return [
+          parseInt(value.slice(1, 3), 16),
+          parseInt(value.slice(3, 5), 16),
+          parseInt(value.slice(5, 7), 16)
+        ];
+      }
+
+      function renderOne(node, color) {
+        const [r, g, b] = color;
+        const maximum = Math.max(r, g, b);
+        node.style.backgroundColor = `rgb(${r} ${g} ${b})`;
+        node.style.boxShadow = maximum > 3
+          ? `0 0 ${Math.round(3 + maximum / 22)}px rgb(${r} ${g} ${b} / .72), inset 0 0 3px rgb(255 255 255 / .28)`
+          : "none";
+      }
+
+      function render() {
+        for (let screen = 0; screen < 2; screen++) {
+          for (let index = 0; index < SCREEN_COUNT; index++) {
+            renderOne(screenLedNodes[screen][index], screens[screen][index]);
+          }
+        }
+        for (let index = 0; index < STRIP_COUNT; index++) {
+          renderOne(stripLedNodes[index], strip[index]);
+        }
+      }
+
+      function clearAll() {
+        for (const colors of screens) {
+          for (let index = 0; index < SCREEN_COUNT; index++) colors[index] = [0, 0, 0];
+        }
+        for (let index = 0; index < STRIP_COUNT; index++) strip[index] = [0, 0, 0];
+        render();
+      }
+
+      function fillAll(color) {
+        fillDevice(0, color);
+        fillDevice(1, color);
+        fillDevice(2, color);
+        render();
+      }
+
+      function readFillColor() {
+        const values = fillInputs.map((input) => Number.parseInt(input.value, 10));
+        if (values.some((value) => !Number.isFinite(value))) return null;
+        return values.map((value) => ((value % 256) + 256) % 256);
+      }
+
+      function setPreviewButton(isPlaying, label = null) {
+        const text = label || (isPlaying ? "暂停" : "预览");
+        previewButton.disabled = mode === "design";
+        previewButton.setAttribute("aria-label", isPlaying ? "暂停源代码动画" : "播放所选源代码动画");
+        previewButton.title = isPlaying ? "暂停源代码动画" : "播放所选源代码动画";
+        previewButton.querySelector("span").textContent = text;
+        previewButton.querySelector("svg").innerHTML = isPlaying
+          ? '<path d="M8 5v14M16 5v14"></path>'
+          : '<path d="m8 5 11 7-11 7z"></path>';
+      }
+
+      function stopPreview() {
+        if (timer !== null) {
+          window.clearInterval(timer);
+          timer = null;
+        }
+        playing = false;
+        setPreviewButton(false);
+      }
+
+      function resetAnimationState() {
+        frame = 0;
+        stripIndex = 0;
+        firstFrameDrawn = false;
+        fade = {
+          red: 0, green: 0, blue: 0,
+          redDirection: 1, greenDirection: 1, blueDirection: 1
+        };
+        fireHeat = [
+          Array.from({ length: SCREEN_COUNT }, () => 0),
+          Array.from({ length: SCREEN_COUNT }, () => 0)
+        ];
+        fireSeed = 0x12345678;
+      }
+
+      function enterDesignMode() {
+        if (mode !== "design") {
+          stopPreview();
+          mode = "design";
+          modeSelect.value = mode;
+          previewButton.disabled = true;
+          designTimeline.hidden = false;
+          loadDesignFrame(selectedDesignFrame);
+        }
+        stopDesignPlayback();
+      }
+
+      function selectMode(nextMode) {
+        stopPreview();
+        stopDesignPlayback();
+        mode = nextMode;
+        modeSelect.value = mode;
+        previewButton.disabled = mode === "design";
+        designTimeline.hidden = mode !== "design";
+        resetAnimationState();
+        if (mode === "design") loadDesignFrame(selectedDesignFrame);
+      }
+
+      function previewFrame() {
+        switch (mode) {
+          case "fade": drawFade(); break;
+          case "ripple": drawRipple(); break;
+          case "matrix": drawMatrix(); break;
+          case "rainbow": drawRainbow(); break;
+          case "fire": drawFire(); break;
+          case "wu": drawWu(); break;
+          case "lotus": drawLotus(); break;
+          default: return;
+        }
+        render();
+      }
+
+      function startPreview() {
+        if (mode === "design" || playing) return;
+        if (!firstFrameDrawn) {
+          previewFrame();
+          firstFrameDrawn = true;
+        }
+        if (mode === "wu") {
+          setPreviewButton(false, "静态图案");
+          previewButton.disabled = true;
+          return;
+        }
+        playing = true;
+        setPreviewButton(true);
+        timer = window.setInterval(previewFrame, FRAME_MS);
+      }
+
+      function u8(value) {
+        return value & 0xff;
+      }
+
+      function drawFade() {
+        const update = (value, direction, step) => {
+          if (value >= 250) direction = 0;
+          else if (value <= 5) direction = 1;
+          return [value + (direction === 1 ? step : -step), direction];
+        };
+        [fade.red, fade.redDirection] = update(fade.red, fade.redDirection, 1);
+        [fade.green, fade.greenDirection] = update(fade.green, fade.greenDirection, 2);
+        [fade.blue, fade.blueDirection] = update(fade.blue, fade.blueDirection, 3);
+
+        fillDevice(0, [Math.trunc(fade.red / 4), Math.trunc(fade.green / 4), Math.trunc(fade.blue / 4)]);
+        fillDevice(1, [Math.trunc(fade.green / 4), Math.trunc(fade.blue / 4), Math.trunc(fade.red / 4)]);
+        fillDevice(2, [Math.trunc(fade.blue / 4), Math.trunc(fade.red / 4), Math.trunc(fade.green / 4)]);
+      }
+
+      function drawRipple() {
+        const phase1 = frame;
+        const phase2 = (frame + 28) % 56;
+        const wave1 = phase1 <= 28 ? phase1 : 56 - phase1;
+        const wave2 = phase2 <= 28 ? phase2 : 56 - phase2;
+        const radius1 = 2 + wave1;
+        const radius2 = 2 + wave2;
+        fillDevice(0, [0, 0, 0]);
+        fillDevice(1, [0, 0, 0]);
+        fillDevice(2, [0, 0, 0]);
+
+        for (let row = 0; row < HEIGHT; row++) {
+          const rowDistance = row <= 7 ? 15 - 2 * row : 2 * row - 15;
+          for (let col = 0; col < WIDTH; col++) {
+            const colDistance = col <= 7 ? 15 - 2 * col : 2 * col - 15;
+            const distance = rowDistance + colDistance;
+            if (distance <= radius1) {
+              const trail = radius1 - distance;
+              if (trail <= 2) setScreenPixel(0, row, col, [0, 180, 255]);
+              else if (trail <= 7) setScreenPixel(0, row, col, [0, 35, 90]);
+            }
+            if (distance <= radius2) {
+              const trail = radius2 - distance;
+              if (trail <= 2) setScreenPixel(1, row, col, [255, 80, 0]);
+              else if (trail <= 7) setScreenPixel(1, row, col, [70, 10, 0]);
+            }
+          }
+        }
+
+        for (let i = 0; i < 4; i++) {
+          const index = (stripIndex + STRIP_COUNT - i) % STRIP_COUNT;
+          const colors = [
+            [255, 255, 255],
+            [0, 160, 255],
+            [0, 70, 140],
+            [0, 25, 50]
+          ];
+          setDevice(0, index, colors[i]);
+        }
+        frame = (frame + 1) % 56;
+        stripIndex = (stripIndex + 1) % STRIP_COUNT;
+      }
+
+      const TAIL_LEN = 6;
+      const CYCLE_LEN = 22;
+      const start1 = [0, 9, 3, 15, 6, 12, 1, 18, 7, 14, 4, 20, 10, 2, 17, 5];
+      const speed1 = [1, 2, 3, 1, 2, 1, 3, 2, 1, 3, 2, 1, 3, 2, 1, 2];
+      const start2 = [13, 2, 18, 6, 21, 8, 15, 3, 19, 5, 11, 1, 16, 7, 20, 4];
+      const speed2 = [2, 1, 3, 2, 1, 3, 2, 1, 3, 2, 1, 3, 1, 2, 3, 1];
+
+      function drawMatrix() {
+        fillDevice(0, [0, 0, 0]);
+        fillDevice(1, [0, 0, 0]);
+        fillDevice(2, [0, 0, 0]);
+
+        for (let col = 0; col < WIDTH; col++) {
+          let cyclePos = (frame * speed1[col] + start1[col]) % CYCLE_LEN;
+          const head1 = cyclePos - TAIL_LEN;
+          cyclePos = (frame * speed2[col] + start2[col]) % CYCLE_LEN;
+          const head2 = HEIGHT - 1 - cyclePos;
+
+          for (let tail = 0; tail < TAIL_LEN; tail++) {
+            const row1 = head1 - tail;
+            const row2 = head2 + tail;
+            if (row1 >= 0 && row1 < HEIGHT) {
+              const color = tail === 0 ? [180, 255, 200] : tail < 3 ? [0, 150, 40] : [0, 45, 12];
+              setScreenPixel(0, row1, col, color);
+            }
+            if (row2 >= 0 && row2 < HEIGHT) {
+              const color = tail === 0 ? [180, 220, 255] : tail < 3 ? [30, 90, 180] : [8, 22, 55];
+              setScreenPixel(1, row2, col, color);
+            }
+          }
+        }
+
+        for (let i = 0; i < 5; i++) {
+          const index = (stripIndex + STRIP_COUNT - i) % STRIP_COUNT;
+          const color = i === 0 ? [255, 255, 255] : i < 3 ? [0, 180, 70] : [0, 45, 18];
+          setDevice(0, index, color);
+        }
+        frame++;
+        if (frame >= CYCLE_LEN) frame = 0;
+        stripIndex++;
+        if (stripIndex >= STRIP_COUNT) stripIndex = 0;
+      }
+
+      function rainbowPixel(screen, row, col, hue, brightness) {
+        let r;
+        let g;
+        let b;
+        if (hue < 85) {
+          r = 255 - 3 * hue;
+          g = 3 * hue;
+          b = 0;
+        } else if (hue < 170) {
+          hue = u8(hue - 85);
+          r = 0;
+          g = 255 - 3 * hue;
+          b = 3 * hue;
+        } else {
+          hue = u8(hue - 170);
+          r = 3 * hue;
+          g = 0;
+          b = 255 - 3 * hue;
+        }
+        r = Math.trunc(r * brightness / 255);
+        g = Math.trunc(g * brightness / 255);
+        b = Math.trunc(b * brightness / 255);
+        setScreenPixel(screen, row, col, [r, g, b]);
+      }
+
+      function drawRainbow() {
+        fillDevice(0, [0, 0, 0]);
+        fillDevice(1, [0, 0, 0]);
+        fillDevice(2, [0, 0, 0]);
+
+        for (let row = 0; row < HEIGHT; row++) {
+          for (let col = 0; col < WIDTH; col++) {
+            const wave1 = u8(row * 17 + col * 29 + frame * 7);
+            const wave2 = u8(row * 13 + (WIDTH - 1 - col) * 23 + frame * 11);
+            const pulse1 = wave1 < 128 ? u8(wave1 * 2) : u8((255 - wave1) * 2);
+            const pulse2 = wave2 < 128 ? u8(wave2 * 2) : u8((255 - wave2) * 2);
+            const brightness = u8(45 + Math.trunc((pulse1 + pulse2) * 210 / 510));
+            const hue1 = u8(row * 9 + col * 13 + frame * 5 + Math.trunc(pulse2 / 2));
+            const hue2 = u8(hue1 + 85 + frame * 2);
+            rainbowPixel(0, row, col, hue1, brightness);
+            rainbowPixel(1, row, col, hue2, u8(255 - Math.trunc(brightness / 3)));
+          }
+        }
+
+        for (let i = 0; i < STRIP_COUNT; i++) {
+          const hue = u8(i * 5 + frame * 4);
+          setDevice(0, i, [hue, u8(255 - hue), Math.trunc(hue / 2)]);
+        }
+        frame = u8(frame + 1);
+      }
+
+      function fireRandom() {
+        fireSeed = (fireSeed ^ (fireSeed << 13)) >>> 0;
+        fireSeed = (fireSeed ^ (fireSeed >>> 17)) >>> 0;
+        fireSeed = (fireSeed ^ (fireSeed << 5)) >>> 0;
+        return fireSeed;
+      }
+
+      function fireColor(heat) {
+        if (heat < 85) return [heat * 2, 0, 0];
+        if (heat < 170) return [170, (heat - 85) * 2, 0];
+        return [170, 170, heat - 170];
+      }
+
+      function updateFireScreen(screen) {
+        const heat = fireHeat[screen];
+        for (let row = 0; row < 15; row++) {
+          const below2 = row < 14 ? row + 2 : 15;
+          for (let col = 0; col < WIDTH; col++) {
+            const left = col > 0 ? col - 1 : col;
+            const right = col < 15 ? col + 1 : col;
+            const sum = heat[(row + 1) * WIDTH + col] * 2
+              + heat[below2 * WIDTH + col]
+              + heat[(row + 1) * WIDTH + left]
+              + heat[(row + 1) * WIDTH + right];
+            const cooling = fireRandom() % 12;
+            const average = Math.floor(sum / 5);
+            heat[row * WIDTH + col] = average > cooling ? average - cooling : 0;
+          }
+        }
+
+        for (let col = 0; col < WIDTH; col++) {
+          heat[15 * WIDTH + col] = (fireRandom() & 7) === 0
+            ? 45
+            : 180 + fireRandom() % 76;
+        }
+
+        for (let row = 0; row < HEIGHT; row++) {
+          for (let col = 0; col < WIDTH; col++) {
+            setScreenPixel(screen, row, col, fireColor(heat[row * WIDTH + col]));
+          }
+        }
+      }
+
+      function drawFire() {
+        updateFireScreen(0);
+        updateFireScreen(1);
+        for (let i = 0; i < STRIP_COUNT; i++) {
+          const ember = fireHeat[0][15 * WIDTH + (i % WIDTH)];
+          setDevice(0, i, [Math.trunc(ember / 2), Math.trunc(ember / 10), 0]);
+        }
+      }
+
+      const wu = [
+        0x1800, 0x1000, 0x3ffc, 0x5250, 0x1250, 0x3ffc, 0x1250, 0xfffe,
+        0x1000, 0x1010, 0x2efc, 0x5690, 0x1cfe, 0x0810, 0x7010, 0x4010
+      ];
+
+      function drawWu() {
+        fillDevice(1, [0, 0, 0]);
+        fillDevice(2, [0, 0, 0]);
+        for (let screen = 0; screen < 2; screen++) {
+          for (let row = 0; row < HEIGHT; row++) {
+            for (let col = 0; col < WIDTH; col++) {
+              if ((wu[row] & (0x8000 >> col)) !== 0) {
+                setScreenPixel(screen, row, col, [20, 0, 50]);
+              }
+            }
+          }
+        }
+      }
+
+      function lotusDrawRow(screen, row, left, right, color) {
+        for (let col = left; col <= right; col++) {
+          if (col >= 0 && col < WIDTH) setScreenPixel(screen, row, col, color);
+        }
+      }
+
+      function drawLotusScreen(screen, open) {
+        const centerLeft = [7, 7, 6, 6, 6, 6, 7, 7];
+        const centerRight = [8, 8, 9, 9, 9, 9, 8, 8];
+        fillDevice(screen + 1, [0, 0, 0]);
+
+        for (let row = 4; row <= 11; row++) {
+          const offset = Math.trunc(open * (11 - row) / 7);
+          const width = row === 4 || row === 11 ? 0 : 1;
+          lotusDrawRow(screen, row, 7 - offset - width, 7 - offset + width, [115, 12, 48]);
+          lotusDrawRow(screen, row, 8 + offset - width, 8 + offset + width, [115, 12, 48]);
+        }
+        for (let row = 5; row <= 10; row++) {
+          const offset = Math.trunc(open * (11 - row) / 12);
+          const width = row === 5 ? 0 : 1;
+          lotusDrawRow(screen, row, 7 - offset - width, 7 - offset + width, [205, 48, 92]);
+          lotusDrawRow(screen, row, 8 + offset - width, 8 + offset + width, [205, 48, 92]);
+        }
+        for (let row = 3; row <= 10; row++) {
+          lotusDrawRow(screen, row, centerLeft[row - 3], centerRight[row - 3], [235, 105, 130]);
+        }
+        if (open >= 3) lotusDrawRow(screen, 9, 7, 8, [240, 170, 35]);
+        lotusDrawRow(screen, 11, 4, 7, [15, 100, 35]);
+        lotusDrawRow(screen, 11, 8, 11, [15, 100, 35]);
+        lotusDrawRow(screen, 12, 5, 10, [8, 75, 24]);
+        lotusDrawRow(screen, 13, 7, 8, [8, 70, 20]);
+        lotusDrawRow(screen, 14, 7, 8, [8, 70, 20]);
+        lotusDrawRow(screen, 15, 7, 8, [8, 70, 20]);
+      }
+
+      function drawLotus() {
+        let open;
+        if (frame <= 48) open = Math.trunc(frame * 6 / 48);
+        else if (frame <= 64) open = 6;
+        else open = Math.trunc((113 - frame) * 6 / 48);
+        drawLotusScreen(0, open);
+        drawLotusScreen(1, open);
+        frame++;
+        if (frame >= 114) frame = 0;
+      }
+
+      function generatedCode() {
+        const lines = [
+          '#include "ws2812.h"',
+          "",
+          "/* Call once every 39 ms, matching the source animation cadence. */",
+          "void WS2812_DrawCustomAnimationFrame(void)",
+          "{",
+          "    static uint16_t animation_frame = 0U;",
+          "",
+          "    WS2812_ClearAll();",
+          "    switch(animation_frame)",
+          "    {"
+        ];
+        designFrames.forEach((snapshot, frameIndex) => {
+          lines.push(`        case ${frameIndex}U:`);
+          for (let screen = 0; screen < 2; screen++) {
+            const device = screen === 0 ? "WS2812_SCREEN_1" : "WS2812_SCREEN_2";
+            for (let row = 0; row < HEIGHT; row++) {
+              for (let col = 0; col < WIDTH; col++) {
+                const color = snapshot.screens[screen][screenIndex(row, col)];
+                if (color[0] !== 0 || color[1] !== 0 || color[2] !== 0) {
+                  lines.push(`            WS2812_ScreenSetPixel(${device}, ${row}U, ${col}U, ${color[0]}U, ${color[1]}U, ${color[2]}U);`);
+                }
+              }
+            }
+          }
+          for (let index = 0; index < STRIP_COUNT; index++) {
+            const color = snapshot.strip[index];
+            if (color[0] !== 0 || color[1] !== 0 || color[2] !== 0) {
+              lines.push(`            WS2812_SetLED(WS2812_BODY, ${index}U, ${color[0]}U, ${color[1]}U, ${color[2]}U);`);
+            }
+          }
+          lines.push("            break;");
+        });
+        lines.push(
+          "        default:",
+          "            break;",
+          "    }",
+          "",
+          `    animation_frame++;`,
+          `    if(animation_frame >= ${designFrames.length}U)`,
+          "    {",
+          "        animation_frame = 0U;",
+          "    }",
+          "}",
+          ""
+        );
+        return lines.join("\n");
+      }
+
+      document.querySelector("#clear-button").addEventListener("click", () => {
+        enterDesignMode();
+        changeFlag = false;
+        taskState.value = "ws2812_change = 0";
+        taskState.textContent = taskState.value;
+        testButton.setAttribute("aria-pressed", "false");
+        clearState();
+        saveSelectedDesignFrame();
+      });
+      document.querySelector("#fill-button").addEventListener("click", () => {
+        const color = readFillColor();
+        if (color === null) return;
+        enterDesignMode();
+        fillAll(color);
+        saveSelectedDesignFrame();
+      });
+      testButton.addEventListener("click", () => {
+        changeFlag = true;
+        taskState.value = `ws2812_change = ${Number(changeFlag)}`;
+        taskState.textContent = taskState.value;
+        testButton.setAttribute("aria-pressed", "true");
+      });
+
+      modeSelect.addEventListener("change", () => selectMode(modeSelect.value));
+      document.querySelector("#frame-prev").addEventListener("click", () => {
+        enterDesignMode();
+        selectDesignFrame(selectedDesignFrame - 1);
+      });
+      document.querySelector("#frame-next").addEventListener("click", () => {
+        enterDesignMode();
+        selectDesignFrame(selectedDesignFrame + 1);
+      });
+      framePlayButton.addEventListener("click", () => {
+        if (designPlaying) stopDesignPlayback();
+        else startDesignPlayback();
+      });
+      document.querySelector("#frame-duplicate").addEventListener("click", () => {
+        enterDesignMode();
+        stopDesignPlayback();
+        designFrames.push(captureDesignFrame());
+        loadDesignFrame(designFrames.length - 1);
+        renderFrameTimeline();
+      });
+      document.querySelector("#frame-add").addEventListener("click", () => {
+        enterDesignMode();
+        stopDesignPlayback();
+        designFrames.push({
+          screens: Array.from({ length: 2 }, () => Array.from({ length: SCREEN_COUNT }, () => [0, 0, 0])),
+          strip: Array.from({ length: STRIP_COUNT }, () => [0, 0, 0])
+        });
+        loadDesignFrame(designFrames.length - 1);
+        renderFrameTimeline();
+      });
+      document.querySelector("#frame-delete").addEventListener("click", () => {
+        if (designFrames.length === 1) return;
+        enterDesignMode();
+        stopDesignPlayback();
+        designFrames.splice(selectedDesignFrame, 1);
+        loadDesignFrame(Math.min(selectedDesignFrame, designFrames.length - 1));
+        renderFrameTimeline();
+      });
+      frameList.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-frame-index]");
+        if (!button) return;
+        enterDesignMode();
+        selectDesignFrame(Number(button.dataset.frameIndex));
+      });
+      previewButton.addEventListener("click", () => {
+        if (mode === "design") return;
+        if (playing) stopPreview();
+        else startPreview();
+      });
+      document.querySelector("#export-button").addEventListener("click", () => {
+        stopPreview();
+        stopDesignPlayback();
+        enterDesignMode();
+        codeOutput.value = generatedCode();
+        if (typeof exportDialog.showModal === "function") exportDialog.showModal();
+        else exportDialog.setAttribute("open", "");
+      });
+      document.querySelector("#close-export").addEventListener("click", () => exportDialog.close());
+      document.querySelector("#copy-code").addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(codeOutput.value);
+        } catch {
+          codeOutput.focus();
+          codeOutput.select();
+          document.execCommand("copy");
+        }
+      });
+      document.querySelector("#download-code").addEventListener("click", () => {
+        const blob = new Blob([codeOutput.value], { type: "text/x-c;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "ws2812_custom_pattern.c";
+        link.click();
+        URL.revokeObjectURL(url);
+      });
+
+      render();
+      renderFrameTimeline();
+    })();
+  </script>
+</body>
+</html>
