@@ -517,6 +517,9 @@
             <option value="wu">静态点阵图案</option>
             <option value="lotus">莲花开合</option>
           </optgroup>
+          <optgroup label="新增仿真动画">
+            <option value="water">水波流动</option>
+          </optgroup>
         </select>
       </label>
       <button id="preview-button" class="icon-button" type="button" title="播放所选源代码动画" aria-label="播放所选源代码动画" disabled>
@@ -631,7 +634,7 @@
     </section>
 
     <footer class="footer">
-      <span>动画参数取自 ws2812.c 注释版本；当前有效 WS2812_Change() 为空实现</span>
+      <span>源码预览参数取自 ws2812.c 注释版本；水波为模拟器独立实现；当前有效 WS2812_Change() 为空实现</span>
       <span>屏幕蛇形坐标 · 灯带索引 0 → 59 · 设计帧序列可导出</span>
     </footer>
   </main>
@@ -1013,6 +1016,7 @@
           case "fire": drawFire(); break;
           case "wu": drawWu(); break;
           case "lotus": drawLotus(); break;
+          case "water": drawWater(); break;
           default: return;
         }
         render();
@@ -1305,6 +1309,43 @@
         drawLotusScreen(1, open);
         frame++;
         if (frame >= 114) frame = 0;
+      }
+
+      function waterTriangle(phase) {
+        return phase < 128 ? phase * 2 : (255 - phase) * 2;
+      }
+
+      function waterColor(level, screen) {
+        if (level >= 220) return screen === 0 ? [140, 240, 255] : [100, 255, 230];
+        if (level >= 160) return screen === 0 ? [0, 150, 225] : [0, 190, 180];
+        if (level >= 90) return screen === 0 ? [0, 78, 150] : [0, 110, 112];
+        if (screen === 0) return [0, 16 + Math.trunc(level / 5), 50 + Math.trunc(level / 3)];
+        return [0, 22 + Math.trunc(level / 6), 42 + Math.trunc(level / 4)];
+      }
+
+      function drawWater() {
+        fillDevice(0, [0, 0, 0]);
+        fillDevice(1, [0, 0, 0]);
+        fillDevice(2, [0, 0, 0]);
+
+        for (let screen = 0; screen < 2; screen++) {
+          for (let row = 0; row < HEIGHT; row++) {
+            for (let col = 0; col < WIDTH; col++) {
+              const phase1 = u8(col * 21 + row * 11 + frame * 7 + screen * 36);
+              const phase2 = u8((WIDTH - 1 - col) * 15 + row * 19 + frame * 4 + screen * 64);
+              const pulse1 = waterTriangle(phase1);
+              const pulse2 = waterTriangle(phase2);
+              const level = Math.trunc((pulse1 * 2 + pulse2) / 3);
+              setScreenPixel(screen, row, col, waterColor(level, screen));
+            }
+          }
+        }
+
+        for (let index = 0; index < STRIP_COUNT; index++) {
+          const phase = u8(index * 13 + frame * 9);
+          setDevice(0, index, waterColor(waterTriangle(phase), 0));
+        }
+        frame = u8(frame + 1);
       }
 
       function generatedCode() {
