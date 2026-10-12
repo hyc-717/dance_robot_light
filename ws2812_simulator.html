@@ -519,6 +519,8 @@
           </optgroup>
           <optgroup label="新增仿真动画">
             <option value="water">水波流动</option>
+            <option value="lotus-bloom">多层莲花开合（240 帧）</option>
+            <option value="water-drop">水滴涟漪（180 帧）</option>
           </optgroup>
         </select>
       </label>
@@ -634,7 +636,7 @@
     </section>
 
     <footer class="footer">
-      <span>源码预览参数取自 ws2812.c 注释版本；水波为模拟器独立实现；当前有效 WS2812_Change() 为空实现</span>
+      <span>源码预览取自 ws2812.c 注释版本；新增水波、莲花和水滴动画为模拟器独立实现；当前有效 WS2812_Change() 为空实现</span>
       <span>屏幕蛇形坐标 · 灯带索引 0 → 59 · 设计帧序列可导出</span>
     </footer>
   </main>
@@ -1017,6 +1019,8 @@
           case "wu": drawWu(); break;
           case "lotus": drawLotus(); break;
           case "water": drawWater(); break;
+          case "lotus-bloom": drawLotusBloom(); break;
+          case "water-drop": drawWaterDrop(); break;
           default: return;
         }
         render();
@@ -1346,6 +1350,228 @@
           setDevice(0, index, waterColor(waterTriangle(phase), 0));
         }
         frame = u8(frame + 1);
+      }
+
+      const BLOOM_FRAME_COUNT = 240;
+      const BLOOM_RAMP_FRAMES = 96;
+      const BLOOM_HOLD_END = 144;
+      const BLOOM_MAX_OPEN = 16;
+      const BLOOM_SCREEN_OFFSET = 30;
+      const bloomOuterLeft = [7, 7, 6, 6, 5, 4, 4, 5];
+      const bloomOuterRight = [8, 8, 9, 9, 10, 11, 11, 10];
+      const bloomOuterSpread = [0, 1, 2, 3, 4, 4, 3, 1];
+      const bloomOuterWidth = [0, 1, 1, 1, 2, 1, 1, 0];
+      const bloomMiddleLeft = [7, 7, 6, 6, 7, 7];
+      const bloomMiddleRight = [8, 8, 9, 9, 8, 8];
+      const bloomMiddleSpread = [0, 1, 2, 2, 1, 0];
+      const bloomMiddleWidth = [0, 0, 1, 1, 0, 0];
+      const bloomInnerLeft = [7, 6, 6, 6, 7, 7];
+      const bloomInnerRight = [8, 9, 9, 9, 8, 8];
+      const bloomInnerSpread = [0, 0, 1, 1, 0, 0];
+      const bloomInnerWidth = [0, 0, 1, 1, 0, 0];
+
+      function lotusBloomOpen(localFrame) {
+        if (localFrame < BLOOM_RAMP_FRAMES) return Math.trunc(localFrame / 6);
+        if (localFrame < BLOOM_HOLD_END) return BLOOM_MAX_OPEN;
+        return Math.trunc((BLOOM_FRAME_COUNT - localFrame) / 6);
+      }
+
+      function drawBloomSpan(screen, row, left, right, color) {
+        for (let col = Math.max(0, left); col <= Math.min(WIDTH - 1, right); col++) {
+          setScreenPixel(screen, row, col, color);
+        }
+      }
+
+      function drawLotusBloomScreen(screen, localFrame) {
+        const open = lotusBloomOpen(localFrame);
+        const middleOpen = Math.max(0, open - 3);
+        const innerOpen = Math.max(0, open - 5);
+        const device = screen + 1;
+        const leafGreen = 70 + open * 3;
+        fillDevice(device, [0, 0, 0]);
+
+        drawBloomSpan(screen, 11, 1, 6, [8, leafGreen + 25, 32]);
+        drawBloomSpan(screen, 11, 9, 14, [8, leafGreen + 25, 32]);
+        drawBloomSpan(screen, 12, 3, 12, [5, leafGreen + 12, 24]);
+        drawBloomSpan(screen, 13, 5, 10, [4, leafGreen, 20]);
+        drawBloomSpan(screen, 14, 6, 9, [3, leafGreen - 5, 18]);
+        drawBloomSpan(screen, 15, 7, 8, [3, leafGreen - 8, 16]);
+
+        for (let row = 3; row <= 10; row++) {
+          const i = row - 3;
+          const shift = Math.trunc(open * bloomOuterSpread[i] / BLOOM_MAX_OPEN);
+          const width = bloomOuterWidth[i] + Math.trunc(open / 8);
+          const color = [120 + open * 4, 18 + open * 2, 52 + open * 4];
+          drawBloomSpan(screen, row,
+            bloomOuterLeft[i] - shift - width,
+            bloomOuterLeft[i] - shift + width,
+            color);
+          drawBloomSpan(screen, row,
+            bloomOuterRight[i] + shift - width,
+            bloomOuterRight[i] + shift + width,
+            color);
+        }
+
+        for (let row = 5; row <= 10; row++) {
+          const i = row - 5;
+          const shift = Math.trunc(middleOpen * bloomMiddleSpread[i] / 13);
+          const width = bloomMiddleWidth[i] + Math.trunc(middleOpen / 7);
+          const color = [190 + Math.trunc(open * 3), 30 + open * 5, 78 + open * 5];
+          drawBloomSpan(screen, row,
+            bloomMiddleLeft[i] - shift - width,
+            bloomMiddleLeft[i] - shift + width,
+            color);
+          drawBloomSpan(screen, row,
+            bloomMiddleRight[i] + shift - width,
+            bloomMiddleRight[i] + shift + width,
+            color);
+        }
+
+        for (let row = 4; row <= 9; row++) {
+          const i = row - 4;
+          const shift = Math.trunc(innerOpen * bloomInnerSpread[i] / 11);
+          const width = bloomInnerWidth[i] + Math.trunc(innerOpen / 6);
+          const color = [235, 92 + open * 4, 122 + open * 3];
+          drawBloomSpan(screen, row,
+            bloomInnerLeft[i] - shift - width,
+            bloomInnerLeft[i] - shift + width,
+            color);
+          drawBloomSpan(screen, row,
+            bloomInnerRight[i] + shift - width,
+            bloomInnerRight[i] + shift + width,
+            color);
+        }
+
+        if (open >= 8) {
+          const coreColor = localFrame % 12 < 6 ? [255, 198, 48] : [245, 95, 22];
+          setScreenPixel(screen, 7, 7, coreColor);
+          setScreenPixel(screen, 7, 8, coreColor);
+          setScreenPixel(screen, 8, 7, coreColor);
+          setScreenPixel(screen, 8, 8, coreColor);
+        }
+      }
+
+      function lotusStripColor(level, open) {
+        if (open >= 8 && level >= 220) return [255, 190, 45];
+        if (level >= 180) return [230, 65, 125];
+        if (level >= 90) return [135, 18, 62];
+        return [8, 8 + Math.trunc(open / 3), 16 + open];
+      }
+
+      function drawLotusBloom() {
+        for (let screen = 0; screen < 2; screen++) {
+          const localFrame = (frame + screen * BLOOM_SCREEN_OFFSET) % BLOOM_FRAME_COUNT;
+          drawLotusBloomScreen(screen, localFrame);
+        }
+
+        const open = lotusBloomOpen(frame);
+        for (let index = 0; index < STRIP_COUNT; index++) {
+          const phase = u8(index * 17 + frame * 9);
+          setDevice(0, index, lotusStripColor(waterTriangle(phase), open));
+        }
+        frame = (frame + 1) % BLOOM_FRAME_COUNT;
+      }
+
+      const WATER_DROP_FRAME_COUNT = 180;
+      const WATER_DROP_FALL_FRAMES = 24;
+      const WATER_DROP_IMPACT_FRAME = 24;
+      const WATER_DROP_RIPPLE_START = 32;
+      const WATER_DROP_RIPPLE_END = 140;
+      const WATER_DROP_SCREEN_OFFSET = 18;
+
+      function waterDropTriangle(phase) {
+        return phase < 128 ? phase * 2 : (255 - phase) * 2;
+      }
+
+      function waterDropScale(value, fade) {
+        return Math.trunc(value * fade / 255);
+      }
+
+      function waterDropRingError(distanceSquared, radius) {
+        return Math.abs(distanceSquared - radius * radius);
+      }
+
+      function drawWaterDropPixel(screen, row, col, localFrame) {
+        const shimmerPhase = u8(col * 17 + row * 23 + localFrame * 3 + screen * 47);
+        const shimmer = waterDropTriangle(shimmerPhase);
+        let color = [0, 7 + Math.trunc(shimmer / 28), 24 + Math.trunc(shimmer / 12)];
+        const dx = col * 2 - 15;
+        const dy = row * 2 - 15;
+        const distanceSquared = dx * dx + dy * dy;
+
+        if (localFrame >= WATER_DROP_RIPPLE_START && localFrame < WATER_DROP_RIPPLE_END) {
+          const age = localFrame - WATER_DROP_RIPPLE_START;
+          const radius = 1 + Math.trunc(age / 8);
+          const innerRadius = radius - 3;
+          const faintRadius = radius - 6;
+          const fade = Math.max(72, 255 - Math.max(0, age - 40) * 3);
+          const bandWidth = radius * 4 + 2;
+          if (waterDropRingError(distanceSquared, radius) <= bandWidth) {
+            color = [0, waterDropScale(135, fade), waterDropScale(225, fade)];
+          } else if (innerRadius > 0
+            && waterDropRingError(distanceSquared, innerRadius) <= innerRadius * 4 + 2) {
+            color = [0, waterDropScale(52, fade), waterDropScale(115, fade)];
+          } else if (faintRadius > 0
+            && waterDropRingError(distanceSquared, faintRadius) <= faintRadius * 4 + 2) {
+            color = [0, waterDropScale(24, fade), waterDropScale(65, fade)];
+          }
+        }
+
+        if (localFrame < WATER_DROP_FALL_FRAMES) {
+          const dropRow = 1 + Math.trunc(localFrame / 4);
+          if (row === dropRow && (col === 7 || col === 8)) color = [185, 250, 255];
+          else if (row === dropRow - 1 && (col === 7 || col === 8)) color = [0, 92, 175];
+        } else if (localFrame >= WATER_DROP_IMPACT_FRAME
+          && localFrame < WATER_DROP_RIPPLE_START) {
+          const splashAge = localFrame - WATER_DROP_IMPACT_FRAME;
+          const arm = 1 + Math.trunc(splashAge / 2);
+          if ((row === 7 || row === 8) && (col === 7 - arm || col === 8 + arm)) {
+            color = [90, 230, 255];
+          } else if (splashAge < 4 && row === 6 && (col === 7 || col === 8)) {
+            color = [185, 255, 255];
+          } else if (splashAge < 4 && row === 9 && (col === 7 || col === 8)) {
+            color = [30, 150, 230];
+          }
+        } else if (localFrame >= WATER_DROP_RIPPLE_START && localFrame < 44) {
+          const bubbleRow = 8 - Math.trunc((localFrame - WATER_DROP_RIPPLE_START) / 4);
+          if (row === bubbleRow && (col === 7 || col === 8)) color = [115, 230, 255];
+        }
+
+        setScreenPixel(screen, row, col, color);
+      }
+
+      function drawWaterDropScreen(screen, localFrame) {
+        fillDevice(screen + 1, [0, 0, 0]);
+        for (let row = 0; row < HEIGHT; row++) {
+          for (let col = 0; col < WIDTH; col++) {
+            drawWaterDropPixel(screen, row, col, localFrame);
+          }
+        }
+      }
+
+      function drawWaterDropStrip() {
+        for (let index = 0; index < STRIP_COUNT; index++) {
+          const phase = u8(index * 15 + frame * 3);
+          const shimmer = waterDropTriangle(phase);
+          let color = [0, 9 + Math.trunc(shimmer / 30), 25 + Math.trunc(shimmer / 12)];
+          if (frame >= WATER_DROP_RIPPLE_START && frame < WATER_DROP_RIPPLE_END) {
+            const radius = Math.trunc((frame - WATER_DROP_RIPPLE_START) / 2);
+            const distance = Math.abs(index - 29);
+            const delta = Math.abs(distance - radius);
+            if (delta <= 1) color = [20, 170, 245];
+            else if (delta <= 3) color = [0, 62, 135];
+          }
+          setDevice(0, index, color);
+        }
+      }
+
+      function drawWaterDrop() {
+        for (let screen = 0; screen < 2; screen++) {
+          const localFrame = (frame + screen * WATER_DROP_SCREEN_OFFSET) % WATER_DROP_FRAME_COUNT;
+          drawWaterDropScreen(screen, localFrame);
+        }
+        drawWaterDropStrip();
+        frame = (frame + 1) % WATER_DROP_FRAME_COUNT;
       }
 
       function generatedCode() {
